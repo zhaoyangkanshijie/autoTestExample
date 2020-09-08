@@ -1,6 +1,10 @@
 const puppeteer = require('puppeteer');
-const isDev = true;
-const domain = isDev ? 'http://localhost:32756' : 'https://www.baidu.com';
+const environment = {
+    development: 'http://localhost:32756',
+    uat: 'https://www.baidu.com:9000',
+    production: 'https://www.baidu.com'
+}
+const domain = environment.development;
 
 describe('step1',()=>{
     let browser;
