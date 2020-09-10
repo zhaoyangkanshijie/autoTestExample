@@ -11,7 +11,7 @@ describe('step1',()=>{
     let page;
     
     beforeAll(async () => {
-        jest.setTimeout(100000);
+        jest.setTimeout(100000);//否则会报超时错误
         browser = await puppeteer.launch({
           headless: false
         });
@@ -23,7 +23,6 @@ describe('step1',()=>{
             width: 320,
             height: 480
         });
-        await page.goto(`${domain}/accountoff/process`);
         // await page.evaluate(() => window.localStorage.setItem('antd-pro-authority', 'guest'));
         // await page.waitForSelector('#userName', {
         //     timeout: 5000,
