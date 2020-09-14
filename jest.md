@@ -1,4 +1,4 @@
-# 单元测试Puppeteer
+# 单元测试Jest
 
 * [安装与基础使用](#安装与基础使用)
 * [使用样例](#使用样例)
@@ -16,6 +16,8 @@
     [Jest + Puppeteer 界面自动化测试](https://blog.csdn.net/qq_33303090/article/details/95041159)
 
     [webpack打包踩坑之TypeError: Cannot read property 'bindings' of null](https://www.cnblogs.com/Joe-and-Joan/p/10335881.html)
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
 
 2. 详解
 
@@ -54,6 +56,22 @@
             // 后处理操作
         })
     })
+    ```
+
+    架构
+    ```txt
+    Browser： 对应一个浏览器实例，一个 Browser 可以包含多个 BrowserContext
+    BrowserContext： 对应浏览器一个上下文会话，就像我们打开一个普通的 Chrome 之后又打开一个隐身模式的浏览器一样，BrowserContext 具有独立的 Session(cookie 和 cache 独立不共享)，一个 BrowserContext 可以包含多个 Page
+    Page：表示一个 Tab 页面，通过 browserContext.newPage()/browser.newPage() 创建，browser.newPage() 创建页面时会使用默认的 BrowserContext，一个 Page 可以包含多个 Frame
+    Frame: 一个框架，每个页面有一个主框架（page.MainFrame()）,也可以多个子框架，主要由 iframe 标签创建产生的
+    ExecutionContext： 是 javascript 的执行环境，每一个 Frame 都一个默认的 javascript 执行环境
+    ElementHandle: 对应 DOM 的一个元素节点，通过该该实例可以实现对元素的点击，填写表单等行为，我们可以通过选择器，xPath 等来获取对应的元素
+    JsHandle：对应 DOM 中的 javascript 对象，ElementHandle 继承于 JsHandle，由于我们无法直接操作 DOM 中对象，所以封装成 JsHandle 来实现相关功能
+    CDPSession：可以直接与原生的 CDP 进行通信，通过 session.send 函数直接发消息，通过 session.on 接收消息，可以实现 Puppeteer API 中没有涉及的功能
+    Coverage：获取 JavaScript 和 CSS 代码覆盖率
+    Tracing：抓取性能数据进行分析
+    Response： 页面收到的响应
+    Request： 页面发出的请求
     ```
 
 ## 使用样例
@@ -295,3 +313,5 @@
     // 2 - afterAll 
     // 1 - afterAll
     ```
+
+

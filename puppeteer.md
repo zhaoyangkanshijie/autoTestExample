@@ -9,6 +9,13 @@
 * [Touchscreen](#Touchscreen)
 * [请求与响应](#请求与响应)
 * [自动输入表单并提交](#自动输入表单并提交)
+* [等待加载](#等待加载)
+* [植入javascript代码](#植入javascript代码)
+* [抓取iframe中的元素](#抓取iframe中的元素)
+* [页面性能分析](#页面性能分析)
+* [文件的上传和下载](#文件的上传和下载)
+* [跳转新tab页处理](#跳转新tab页处理)
+* [性能和优化](#性能和优化)
 
 ---
 
@@ -398,6 +405,14 @@ touchscreen.tap(x, y)触发 touchstart 和 touchend 事件
 
 ## 请求与响应
 
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+    [Puppeteer拦截某条url并返回其响应内容(场景和方法) API RequestInterception拦截器的使用](https://blog.csdn.net/m0_37089544/article/details/82225408?utm_source=blogxgwz0)
+
+2. 详解
+
 每当页面发送一个请求，以下事件会被 puppeteer 页面触发：
 
 1. 'request' 当请求发起后页面会触发这个事件。
@@ -454,6 +469,89 @@ response.text()
 response.url()
 ```
 
+基础使用
+```js
+await page.setRequestInterception(true); //开启请求拦截
+    
+page.on('request', request => {
+    const type = request.resourceType();
+    console.log('request',request,type);
+    //request.respond({
+    //  status: 404,
+    //  contentType: 'text/plain',
+    //  body: 'Not Found!'
+    //});
+    return request.continue(); //继续原有请求
+});
+page.on('response', response => {
+    console.log('response',response);
+});
+page.on('requestfailed', request => {
+    console.log(request.url() + ' ' + request.failure().errorText);
+});
+
+await page.goto(`${domain}/accountoff/process`);
+console.log('url:', await page.url());
+await page.type('.tplinkid', 'online@tp-link.com.cn', {delay: 100});
+await page.click('.send');
+await page.waitFor(5000);
+```
+
+改写请求
+```js
+(async () => {
+    const browser = await puppeteer.launch();
+    const page = await browser.newPage();
+    const blockTypes = new Set(['image', 'media', 'font']);
+    await page.setRequestInterception(true); //开启请求拦截
+    page.on('request', request => {
+        const type = request.resourceType();
+        const shouldBlock = blockTypes.has(type);
+        if(shouldBlock){
+            //直接阻止请求
+            return request.abort();
+        }else{
+            //对请求重写
+            return request.continue({
+                //可以对 url，method，postData，headers 进行覆盖
+                headers: Object.assign({}, request.headers(), {
+                    'puppeteer-test': 'true'
+                })
+            });
+        }
+    });
+    await page.goto('https://demo.youdata.com');
+    await page.close();
+    await browser.close();
+})();
+```
+
+测试xhr
+```js
+await page.setRequestInterception(true); //开启请求拦截
+        
+page.on('request', request => {
+    return request.continue();
+});
+page.on('response', response => {
+    if(response.request().resourceType() === 'xhr'){ //不是xhr则无法序列化json，会报错
+        let text = response.text();
+        text.then((result)=>{
+            console.log('text',result);
+        })
+        let json = response.json();
+        json.then((result)=>{
+            console.log('json',result);
+        })
+    }
+});
+
+await page.goto(`${domain}/a/c`);
+console.log('url:', await page.url());
+await page.click('.send');
+await page.waitFor(5000);
+```
+
 ## 自动输入表单并提交
 
 1. 参考链接
@@ -482,3 +580,243 @@ response.url()
         browser.close();
     })()
     ```
+
+## 等待加载
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+  * 加载导航页面
+
+    * page.goto：打开新页面
+    * page.goBack ：回退到上一个页面
+    * page.goForward ：前进到下一个页面
+    * page.reload ：重新加载页面
+    * page.waitForNavigation：等待页面跳转
+
+    ```js
+    await page.goto('https://www.baidu.com', {
+      timeout: 30 * 1000,
+      waitUntil: [
+          'load',              //等待 “load” 事件触发
+          'domcontentloaded',  //等待 “domcontentloaded” 事件触发
+          'networkidle0',      //在 500ms 内没有任何网络连接
+          'networkidle2'       //在 500ms 内网络连接个数不超过 2 个
+      ]
+    });
+    ```
+
+  * 等待元素、请求、响应
+
+    * page.waitForXPath：等待 xPath 对应的元素出现，返回对应的 ElementHandle 实例
+    * page.waitForSelector ：等待选择器对应的元素出现，返回对应的 ElementHandle 实例
+    * page.waitForResponse ：等待某个响应结束，返回 Response 实例
+    * page.waitForRequest：等待某个请求出现，返回 Request 实例
+
+    ```js
+    await page.waitForXPath('//img');
+    await page.waitForSelector('#uniqueId');
+    await page.waitForResponse('https://d.youdata.netease.com/api/dash/hello');
+    await page.waitForRequest('https://d.youdata.netease.com/api/dash/hello');
+    ```
+
+  * 自定义等待
+
+    * page.waitForFunction：等待在页面中自定义函数的执行结果，返回 JsHandle 实例
+    * page.waitFor：设置等待时间，实在没办法的做法
+
+    ```js
+    await page.goto(url, { 
+        timeout: 120000, 
+        waitUntil: 'networkidle2' 
+    });
+    //我们可以在页面中定义自己认为加载完的事件，在合适的时间点我们将该事件设置为 true
+    //以下是我们项目在触发截图时的判断逻辑，如果 renderdone 出现且为 true 那么就截图，如果是 Object，说明页面加载出错了，我们可以捕获该异常进行提示
+    let renderdoneHandle = await page.waitForFunction('window.renderdone', {
+        polling: 120
+    });
+    const renderdone = await renderdoneHandle.jsonValue();
+    if (typeof renderdone === 'object') {
+        console.log(`加载页面失败：报表${renderdone.componentId}出错 -- ${renderdone.message}`);
+    }else{
+        console.log('页面加载成功');
+    }
+    ```
+
+## 植入javascript代码
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    使用场景
+
+    测试邮箱时，打开的标签iframe越来越多，需要手动关闭
+
+    ```js
+    (async () => {
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        await page.goto('https://webmail.vip.188.com');
+        //注册一个 Node.js 函数，在浏览器里运行
+        await page.exposeFunction('md5', text =>
+            crypto.createHash('md5').update(text).digest('hex')
+        );
+        //通过 page.evaluate 在浏览器里执行删除无用的 iframe 代码
+        await page.evaluate(async () =>  {
+            let iframes = document.getElementsByTagName('iframe');
+            for(let i = 3; i <  iframes.length - 1; i++){
+                let iframe = iframes[i];
+                if(iframe.name.includes("frameBody")){
+                    iframe.src = 'about:blank';
+                    try{
+                        iframe.contentWindow.document.write('');
+                        iframe.contentWindow.document.clear();
+                    }catch(e){}
+                    //把iframe从页面移除
+                    iframe.parentNode.removeChild(iframe);
+                }
+            }
+            //在页面中调用 Node.js 环境中的函数
+            const myHash = await window.md5('PUPPETEER');
+            console.log(`md5 of ${myString} is ${myHash}`);
+        });
+        await page.close();
+        await browser.close();
+    })();
+    ```
+
+## 抓取iframe中的元素
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    ```js
+    (async () => {
+        const browser = await puppeteer.launch({headless: false, slowMo: 50});
+        const page = await browser.newPage();
+        await page.goto('https://www.188.com');
+        //点击使用密码登录
+        let passwordLogin = await page.waitForXPath('//*[@id="qcode"]/div/div[2]/a');
+        await passwordLogin.click();
+        for (const frame of page.mainFrame().childFrames()){
+            //根据 url 找到登录页面对应的 iframe
+            if (frame.url().includes('passport.188.com')){
+                await frame.type('.dlemail', 'admin@admin.com');
+                await frame.type('.dlpwd', '123456');
+                await Promise.all([
+                    frame.click('#dologin'),
+                    page.waitForNavigation()
+                ]);
+                break;
+            }
+        }
+        await page.close();
+        await browser.close();
+    })();
+    ```
+
+## 页面性能分析
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    ```js
+    (async () => {
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        await page.tracing.start({path: './files/trace.json'});
+        await page.goto('https://www.google.com');
+        await page.tracing.stop();
+        /*
+            continue analysis from 'trace.json'
+        */
+        browser.close();
+    })();
+    ```
+
+## 文件的上传和下载
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    ```js
+    (async () => {
+        const browser = await puppeteer.launch();
+        const page = await browser.newPage();
+        //通过 CDP 会话设置下载路径
+        const cdp = await page.target().createCDPSession();
+        await cdp.send('Page.setDownloadBehavior', {
+            behavior: 'allow', //允许所有下载请求
+            downloadPath: 'path/to/download'  //设置下载路径
+        });
+        //点击按钮触发下载
+        await (await page.waitForSelector('#someButton')).click();
+        //等待文件出现，轮训判断文件是否出现
+        await waitForFile('path/to/download/filename');
+
+        //上传时对应的 inputElement 必须是<input>元素
+        let inputElement = await page.waitForXPath('//input[@type="file"]');
+        await inputElement.uploadFile('/path/to/file');
+        browser.close();
+    })();
+    ```
+
+## 跳转新tab页处理
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    ```js
+    let page = await browser.newPage();
+    await page.goto(url);
+    let btn = await page.waitForSelector('#btn');
+    //在点击按钮之前，事先定义一个 Promise，用于返回新 tab 的 Page 对象
+    const newPagePromise = new Promise(res => 
+        browser.once('targetcreated', 
+            target => res(target.page())
+        )
+    );
+    await btn.click();
+    //点击按钮后，等待新tab对象
+    let newPage = await newPagePromise;
+    ```
+
+## 性能和优化
+
+1. 参考链接
+
+    [结合项目来谈谈 Puppeteer](https://zhuanlan.zhihu.com/p/76237595)
+
+2. 详解
+
+    * 关于共享内存：
+
+        - Chrome 默认使用 /dev/shm 共享内存，但是 docker 默认/dev/shm 只有64MB，显然是不够使用的，提供两种方式来解决：
+        - 启动 docker 时添加参数 --shm-size=1gb 来增大 /dev/shm 共享内存，但是 swarm 目前不支持 shm-size 参数
+        - 启动 Chrome 添加参数 - disable-dev-shm-usage，禁止使用 /dev/shm 共享内存
+
+    * 尽量使用同一个浏览器实例，这样可以实现缓存共用
+    * 通过请求拦截没必要加载的资源
+    * 像我们自己打开 Chrome 一样，tab 页多必然会卡，所以必须有效控制 tab 页个数
+    * 一个 Chrome 实例启动时间长了难免会出现内存泄漏，页面奔溃等现象，所以定时重启 Chrome 实例是有必要的
+    * 为了加快性能，关闭没必要的配置，比如：-no-sandbox（沙箱功能），--disable-extensions（扩展程序）等
+    * 尽量避免使用 page.waifFor(1000)，让程序自己决定效果会更好
+    * 因为和 Chrome 实例连接时使用的 Websocket，会存在 Websocket sticky session 问题，这个需要特别注意
