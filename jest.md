@@ -1,7 +1,8 @@
 # 单元测试Jest
 
 * [安装与基础使用](#安装与基础使用)
-* [使用样例](#使用样例)
+* [jest基础使用样例](#jest基础使用样例)
+* [vue2单元测试](#vue2单元测试)
 
 ---
 
@@ -74,7 +75,7 @@
     Request： 页面发出的请求
     ```
 
-## 使用样例
+## jest基础使用样例
 
 1. 参考链接
 
@@ -86,6 +87,7 @@
 
 2. 详解
 
+    * 大小相等关系判断，真假非判断，匹配，包含
     ```js
     // sum.ts
     const sum = (a: number, b: number): number => { 
@@ -113,7 +115,7 @@
       // toBeGreaterThanO「Equal:判断数值是否大于等于期望值 
       expect(sum(1, 2)).toBeGreaterThan0rEqual(3);
       // toBeLessThanOrEqual:判断数值是否小于等于期望值 
-      expect(sum(1, 2)).toBeLessThan0rEqual(3);
+      expect(sum(1, 2)).toBeLessThanOrEqual(3);
       expect(n).toBeNull(); //判断是否为null
       expect(value).toBeCloseTo(0.3); // 浮点数判断相等
       expect('Christoph').toMatch(/stop/); //正则表达式判断
@@ -122,6 +124,7 @@
     });
     ```
 
+    * 匹配
     ```js
     // showHello.ts
     const showHello: string = 'Hello,aaa';
@@ -136,6 +139,7 @@
     });
     ```
 
+    * 包含
     ```js
     // array.ts
     const array: [number] = [1, 2, 3, 4];
@@ -150,6 +154,7 @@
     });
     ```
 
+    * 抛出异常
     ```js
     // compileAndroidCode.ts 
     const compileAndroidCode = Error => { 
@@ -164,6 +169,7 @@
     });
     ```
 
+    * 测试请求回调
     ```js
     // 回调
     it('done', (done) => { 
@@ -178,6 +184,7 @@
     });
     ```
 
+    * 函数调用、调用次数、传参、返回值
     ```js
     function sayHello(name) { 
       return `Hello ${name}`;
@@ -202,6 +209,7 @@
     });
     ```
 
+    * 保证断言调用
     ```js
     it('promise resolve' , () => {
       return fetch('/example').then((res) => { 
@@ -228,6 +236,7 @@
     });
     ```
 
+    * 单元测试组块、执行顺序
     ```js
     describe('outer', () => {
       console.log('describe outer-a');
@@ -262,6 +271,7 @@
     // test for describe inner 2
     ```
 
+    * 请求返回值
     ```js
     //推荐
     it('best method', () => {
@@ -286,6 +296,7 @@
     });
     ```
 
+    * 生命周期
     ```js
     // 生 命 周 期 钩 子
     beforeAll(() => console.log('1 - beforeAll')); 
@@ -314,4 +325,111 @@
     // 1 - afterAll
     ```
 
+## vue2单元测试
 
+1. 参考链接
+
+    [马上就2021年了，你还不懂怎么在vue做单元测试？](https://juejin.cn/post/6903690374158974989)
+
+    [单元测试（二）—— Jest结合Vue-test-utils入门实战](https://blog.csdn.net/sinat_33312523/article/details/82966085)
+
+2. 详解
+
+    * 添加测试框架
+
+      vue add unit-jest 
+
+      执行这句命令就可以，执行完后，项目根目录会多出一个tests文件夹，这里存放所有单元测试代码,文件后缀为.spec.js。npm run test:unit之后这些文件就会被执行
+
+    * 针对代码进行测试
+
+      组件
+      ```js
+      export default {
+        data:()=>({
+          text:'',
+          list:[32]
+        }),
+        created() {
+          this.getList()
+        },
+        methods:{
+          async getList(){
+            let data = await axios.get('http://192.168.22.36:3000/unit')
+            this.list = [...this.list,...data.data.list]
+          },
+          addList(){
+            this.list.push(this.text || 'hahaha')
+            this.text = ''
+          },
+          del(item){
+          this.list = this.list.filter(list=>list.id !== item.id)
+          }
+        }
+      }
+      ```
+
+      单元测试
+      ```js
+      import { shallowMount } from '@vue/test-utils'//帮助DOM元素抓取的库
+      import Todo from '@/components/Todo.vue'//引入要测试的组件
+      import Axios from 'axios'
+
+      //测试data
+      describe('data实例', () => {
+        it('text', () => {
+          expect(typeof Todo.data().text).toBe('string');
+        });
+        it('list ', () => {
+          expect(Array.isArray(Todo.data().list)).toBeTruthy();
+        });
+      });
+
+      describe('增', () => {
+        it('添加数据', () => {
+          const warp = shallowMount(Todo);
+          warp.find('.add').trigger('click').then(()=>{
+            expect(warp.vm.list.length).toBeGreaterThan(Todo.data().list.length);
+          });
+        });
+      });
+
+      describe('删', () => {
+        it('删除数据', () => {
+          const warp = shallowMount(Todo);
+          warp.find('.del').trigger('click').then(()=>{
+            expect(warp.vm.list.length).toBeLessThan(Todo.data().list.length);
+          });
+        });
+      });
+
+      describe('查', () => {
+        it('查询数据', async () => {
+          const warp = shallowMount(Todo);
+          await warp.vm.getList()
+          expect(warp.vm.list.length).toBeGreaterThan(Todo.data().list.length);
+        });
+      });
+
+      describe('检查接口', () => {
+        it('检查接口', async () => {
+          let { data } = await Axios.get('http://192.168.22.36:3000/unit')
+          expect(data.code).toBe(0)
+        });
+      });
+      ```
+
+    * 执行
+
+      npm run test:unit
+
+    * 测试覆盖率
+
+      jest.config.js
+      ```js
+      module.exports = {
+        preset: '@vue/cli-plugin-unit-jest',
+        collectCoverage:true,
+        collectCoverageFrom:['src/components/*.vue'] //我只做components目录下vue文件测试
+      }
+      ```
