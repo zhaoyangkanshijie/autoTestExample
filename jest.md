@@ -3,6 +3,7 @@
 * [安装与基础使用](#安装与基础使用)
 * [jest基础使用样例](#jest基础使用样例)
 * [vue2单元测试](#vue2单元测试)
+* [vue2单元测试添加到现有项目](#vue2单元测试添加到现有项目)
 
 ---
 
@@ -433,3 +434,123 @@
         collectCoverageFrom:['src/components/*.vue'] //我只做components目录下vue文件测试
       }
       ```
+
+## vue2单元测试添加到现有项目
+
+1. 参考链接
+
+    [vue-test-utils-jest](https://github.com/YalongYan/vue-test-utils-jest)
+
+    [vue-select](https://github.com/sagalbot/vue-select)
+
+    [Vue Test Utils](https://vue-test-utils.vuejs.org/zh/guides/)
+
+    [Jest Using With Wbpack](https://jestjs.io/docs/zh-Hans/webpack#%E5%A4%84%E7%90%86%E9%9D%99%E6%80%81%E6%96%87%E4%BB%B6)
+
+    [使用jest对vue项目进行单元测试](https://segmentfault.com/a/1190000016299936)
+
+    [ui组件如何进行单元测试](https://segmentfault.com/q/1010000006970956)
+
+    [Jest Mock](https://blog.csdn.net/sinat_33312523/article/details/82970655)
+
+    [用Jest测试Vue中的Methods中的方法和Mock依赖](https://www.jianshu.com/p/41eadb6409ba)
+
+2. 详解
+
+    * 概念
+
+        1. 单元测试（unit测试）
+
+            单元测试是把代码看成是一个个的组件，从而实现每一个组件的单独测试，测试内容主要是组件内每一个函数的返回结果是不是和期望值一样。
+
+        2. 端到端测试（e2e测试）
+
+            e2e测试是把程序作为黑盒子，只负责打开浏览器，把测试内容在页面上输入一遍。
+
+    * 过程
+
+        1. 使用vue-cli初始化webpack4.0项目
+        2. npm i @vue/test-utils babel-jest jest jest-serializer-vue jest-transform-stub vue-jest -D
+            ```js
+            "@vue/test-utils": "^1.0.0-beta.13"
+            "babel-jest": "^21.0.2"
+            "jest": "^22.0.4"
+            "jest-serializer-vue": "^0.3.0"
+            "jest-transform-stub": "^2.0.0"
+            "vue-jest": "^1.0.2"
+            ```
+        3. 修改.babelrc配置
+            ```js
+            {
+              "presets": [
+                ["env", { "modules": false }]
+              ],
+              "env": {
+                "test": {
+                  "presets": ["env"]
+                }
+              }
+            }
+            ```
+        4. jest.conf.js
+            ```js
+            const path = require('path');
+
+            module.exports = {
+                verbose: true,
+                testURL: 'http://localhost/',
+                rootDir: path.resolve(__dirname, '../../'),
+                moduleFileExtensions: [
+                    'js',
+                    'json',
+                    'vue'
+                ],
+                moduleNameMapper: {
+                    '^@\/(.*?\.?(js|vue)?|)$': '<rootDir>/src/$1',   // @路径转换，例如：@/components/Main.vue -> rootDir/src/components/Main.vue
+                    '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$': '<rootDir>/test/unit/__mocks__/fileMock.js', // 模拟加载静态文件
+                    '\\.(css|less|scss|sass)$': '<rootDir>/test/unit/__mocks__/styleMock.js'　　// 模拟加载样式文件   
+                },
+                testMatch: [ //匹配测试用例的文件
+                    '<rootDir>/test/unit/specs/*.spec.js'
+                ],
+                transform: {
+                    '^.+\\.js$': '<rootDir>/node_modules/babel-jest',
+                    '.*\\.(vue)$': '<rootDir>/node_modules/vue-jest'
+                },
+                testPathIgnorePatterns: [
+                    '<rootDir>/test/e2e'
+                ],
+                // setupFiles: ['<rootDir>/test/unit/setup'],
+                snapshotSerializers: ['<rootDir>/node_modules/jest-serializer-vue'],
+                coverageDirectory: '<rootDir>/test/unit/coverage', // 覆盖率报告的目录
+                collectCoverageFrom: [ // 测试报告想要覆盖那些文件，目录，前面加！是避开这些文件
+                    // 'src/components/**/*.(js|vue)',
+                    'src/components/*.(vue)',
+                    '!src/main.js',
+                    '!src/router/index.js',
+                    '!**/node_modules/**'
+                ]
+            }
+            ```
+        5. .eslintrc(jest.conf.js同目录)
+            ```js
+            {
+              "env": { 
+                "jest": true
+              }
+            }
+            ```
+        6. fileMock.js处理文件
+            ```js
+            module.exports = 'test-file-stub';
+            ```
+        7. styleMock.js处理样式
+            ```js
+            module.exports = {}
+            ```
+        8. package.json
+            ```json
+            "unit": "jest --config test/unit/jest.conf.js --coverage"
+            ```
+        9. 根据jest语法写.spec.js
+
